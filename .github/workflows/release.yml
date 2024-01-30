@@ -1,0 +1,43 @@
+name: Build and Release
+
+on:
+  pull_request: # Trigger for pull requests.
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+      - v[0-9]*
+  workflow_dispatch: # Allows for manual triggering.
+    inputs:
+      ref:
+        description: "The ref to build and test."
+        required: false
+        
+# If another instance of this workflow is started for the same PR, cancel the
+# old one.  If a PR is updated and a new test run is started, the old test run
+# will be cancelled automatically to conserve resources.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.ref || github.ref }}
+  cancel-in-progress: true
+  
+jobs:
+  build:
+    name: Checkout and build library
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Build Player
+        run: python build/all.py --release
+
+      # Upload the compiled library
+      - name: Upload compiled library
+        uses: actions/upload-artifact@v3
+        with:
+          name: shaka-player
+          path: |
+            dist
+          if-no-files-found: ignore
+          retention-days: 1
